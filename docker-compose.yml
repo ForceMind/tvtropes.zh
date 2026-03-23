@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tvtropeszh-db
+    environment:
+      POSTGRES_DB: tvtropes_zh
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: tvtropeszh-libretranslate
+    environment:
+      LT_LOAD_ONLY: en,zh
+      LT_UPDATE_MODELS: "true"
+    ports:
+      - "5000:5000"
+
+  api:
+    build:
+      context: ./backend
+    container_name: tvtropeszh-api
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/tvtropes_zh
+      JWT_SECRET: replace-this-secret
+      CORS_ORIGINS: http://localhost:5173
+      DEFAULT_ADMIN_USERNAME: admin
+      DEFAULT_ADMIN_PASSWORD: admin123
+      LIBRETRANSLATE_URL: http://libretranslate:5000
+      DEFAULT_SEED_URL: https://tvtropes.org/pmwiki/pmwiki.php/Main/HomePage
+      DEFAULT_JOB_INTERVAL_MINUTES: 360
+      SCHEDULER_TIMEZONE: Asia/Shanghai
+    depends_on:
+      - db
+      - libretranslate
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./frontend
+    container_name: tvtropeszh-web
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  db_data:
