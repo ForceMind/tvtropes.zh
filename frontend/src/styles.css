@@ -223,7 +223,7 @@ body {
 
 .hero-metrics {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -233,6 +233,7 @@ body {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(186, 230, 253, 0.36);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  min-height: 108px;
 }
 
 .metric-card .ant-typography {
@@ -244,6 +245,45 @@ body {
   color: #fff;
   font-family: 'JetBrains Mono', monospace;
   margin-top: 6px !important;
+}
+
+.metric-progress .ant-progress {
+  margin-top: 8px;
+}
+
+.quick-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.quick-label {
+  border-radius: 999px;
+}
+
+.keyword-chip {
+  border-radius: 999px;
+  cursor: pointer;
+  border-color: rgba(14, 165, 233, 0.32) !important;
+  background: rgba(14, 165, 233, 0.08) !important;
+  transition: all 0.2s ease;
+}
+
+.keyword-chip:hover {
+  border-color: rgba(2, 132, 199, 0.7) !important;
+  background: rgba(14, 165, 233, 0.14) !important;
+}
+
+.search-shortcut {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
 }
 
 .public-controls {
@@ -258,6 +298,12 @@ body {
 .public-controls .ant-segmented {
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid var(--line-soft);
+}
+
+.control-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .public-workbench {
@@ -310,6 +356,18 @@ body {
 .detail-block {
   border-radius: 12px !important;
   border: 1px solid var(--line-soft) !important;
+}
+
+.detail-pane .ant-tabs-nav {
+  margin-bottom: 10px;
+}
+
+.detail-pane .ant-tabs-tab {
+  font-weight: 600;
+}
+
+.detail-meta {
+  margin-bottom: 8px;
 }
 
 .pager-wrap {
@@ -405,7 +463,7 @@ body {
   }
 
   .hero-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .public-workbench {
@@ -477,6 +535,16 @@ body {
 }
 
 @media (max-width: 640px) {
+  .quick-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .search-shortcut {
+    display: none;
+  }
+
   .hero-title {
     font-size: 22px !important;
   }
@@ -495,6 +563,14 @@ body {
 
   .public-controls {
     align-items: flex-start;
+  }
+
+  .control-group {
+    width: 100%;
+  }
+
+  .control-group .ant-segmented {
+    width: 100%;
   }
 
   .hero-metrics {
