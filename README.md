@@ -2,7 +2,7 @@
 
 这是一个可运行的最小版本，用于搭建 TVTropes 中文化站点后台能力：
 
-- 定时抓取 TVTropes 页面
+- 全站持续抓取 TVTropes（持久化 frontier 队列）
 - 原文与中文译文双存储（PostgreSQL）
 - 免费机器翻译（LibreTranslate）
 - 后台管理（登录、检索、译文编辑、任务监控）
@@ -33,9 +33,41 @@ backend/
 frontend/
   src/
 docker-compose.yml
+start.bat / start.ps1
+stop.bat / stop.ps1
 ```
 
-## 快速启动
+## 一键运行（Windows）
+
+直接双击项目根目录的 `start.bat`，或者在 PowerShell 执行：
+
+```powershell
+.\start.ps1
+```
+
+脚本会自动：
+
+1. 检查 Docker 是否可用
+2. 执行 `docker compose up --build -d`
+3. 如果 Docker Hub 连接超时，自动重试镜像源（无需手动改文件）
+4. 输出访问地址并打开前台页面
+
+停止服务：双击 `stop.bat` 或执行：
+
+```powershell
+.\stop.ps1
+```
+
+如果你想手动指定镜像源，也可以在 `.env` 里设置：
+
+```env
+PYTHON_BASE_IMAGE=docker.m.daocloud.io/library/python:3.12-slim
+NODE_BASE_IMAGE=docker.m.daocloud.io/library/node:20-alpine
+POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine
+LIBRETRANSLATE_IMAGE=docker.m.daocloud.io/libretranslate/libretranslate:latest
+```
+
+## 快速启动（手动命令）
 
 1. 启动服务
 
@@ -45,13 +77,16 @@ docker compose up --build
 
 2. 打开页面
 
+- 前台检索页: http://localhost:5173
+- 后台管理台: http://localhost:5174
 - 后端 API: http://localhost:8000
-- 后台管理台: http://localhost:5173
 
 3. 默认账号
 
 - 用户名: `admin`
 - 密码: `admin123`
+
+默认任务已配置为全站模式（`crawl_scope=site`），每轮最多处理 `200` 个 URL，运行记录与队列进度可在后台查看。
 
 ## Windows 本地调试
 
@@ -69,6 +104,8 @@ docker compose up --build
 docker compose up -d db libretranslate
 ```
 
+默认数据库映射到主机 `5433` 端口（容器内仍是 `5432`）。
+
 2. 启动后端（PowerShell）
 
 ```powershell
@@ -76,9 +113,9 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-$env:DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5432/tvtropes_zh"
+$env:DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/tvtropes_zh"
 $env:LIBRETRANSLATE_URL="http://localhost:5000"
-$env:CORS_ORIGINS="http://localhost:5173"
+$env:CORS_ORIGINS="http://localhost:5173,http://localhost:5174"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -88,7 +125,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 npm install
 $env:VITE_API_BASE_URL="http://localhost:8000"
+$env:VITE_APP_MODE="public"
 npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+如需本地调试后台，再开一个 PowerShell：
+
+```powershell
+cd frontend
+$env:VITE_API_BASE_URL="http://localhost:8000"
+$env:VITE_APP_MODE="admin"
+npm run dev -- --host 0.0.0.0 --port 5174
 ```
 
 4. 常用调试入口
@@ -107,15 +154,17 @@ npm run dev -- --host 0.0.0.0 --port 5173
 - `POST /api/v1/jobs` 新建任务
 - `PATCH /api/v1/jobs/{id}` 更新任务
 - `POST /api/v1/jobs/{id}/run` 手动触发
+- `GET /api/v1/jobs/{id}/progress` 队列进度
 - `GET /api/v1/jobs/runs` 执行历史
 
 ## 抓取与翻译流程
 
-1. 调度器按任务间隔执行抓取
-2. 入口 URL 解析并发现站内条目链接
-3. 页面提取标题、摘要、正文文本并入库 `tropes`
-4. 调用 LibreTranslate 产出中文并入库 `translations`
-5. 如果译文被人工审核（`reviewed`），后续原文变更会标记为 `stale`
+1. 初始化将 `seed_url` 放入持久化队列 `crawl_frontier_urls`
+2. 每次运行按 `max_pages_per_run` 从 `pending` 队列取一批 URL
+3. 抓取页面并发现新链接，继续入队（`crawl_scope=site` 时持续扩展）
+4. 页面提取标题、摘要、正文文本并入库 `tropes`
+5. 调用 LibreTranslate 产出中文并入库 `translations`
+6. 如果译文被人工审核（`reviewed`），后续原文变更会标记为 `stale`
 
 ## 生产建议
 

@@ -12,19 +12,22 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
 
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174"
+    )
 
     default_admin_username: str = "admin"
     default_admin_password: str = "admin123"
 
     default_seed_url: str = "https://tvtropes.org/pmwiki/pmwiki.php/Main/HomePage"
-    default_job_interval_minutes: int = 360
+    default_job_interval_minutes: int = 30
 
     scheduler_timezone: str = "Asia/Shanghai"
 
     fetch_timeout_seconds: int = 20
     fetch_user_agent: str = "TVTropesZhBot/0.1 (+https://example.com/bot)"
-    crawl_link_limit: int = 40
+    crawl_link_limit: int = 150
     crawl_request_interval_seconds: float = 0.8
 
     max_content_chars: int = 12000

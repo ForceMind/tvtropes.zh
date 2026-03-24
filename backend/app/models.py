@@ -24,8 +24,10 @@ class CrawlJob(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     seed_url: Mapped[str] = mapped_column(Text)
-    interval_minutes: Mapped[int] = mapped_column(Integer, default=360)
-    max_pages_per_run: Mapped[int] = mapped_column(Integer, default=20)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    max_pages_per_run: Mapped[int] = mapped_column(Integer, default=200)
+    crawl_scope: Mapped[str] = mapped_column(String(24), default="site", index=True)
+    max_depth: Mapped[int] = mapped_column(Integer, default=50)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -36,6 +38,9 @@ class CrawlJob(Base):
 
     runs: Mapped[list[CrawlRun]] = relationship(
         "CrawlRun", back_populates="job", cascade="all, delete-orphan"
+    )
+    frontier_urls: Mapped[list[CrawlFrontierUrl]] = relationship(
+        "CrawlFrontierUrl", back_populates="job", cascade="all, delete-orphan"
     )
 
 
@@ -52,6 +57,27 @@ class CrawlRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     job: Mapped[CrawlJob] = relationship("CrawlJob", back_populates="runs")
+
+
+class CrawlFrontierUrl(Base):
+    __tablename__ = "crawl_frontier_urls"
+    __table_args__ = (UniqueConstraint("job_id", "url", name="uq_frontier_job_url"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("crawl_jobs.id", ondelete="CASCADE"), index=True)
+    url: Mapped[str] = mapped_column(Text)
+    depth: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    retries: Mapped[int] = mapped_column(Integer, default=0)
+    discovered_from: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    job: Mapped[CrawlJob] = relationship("CrawlJob", back_populates="frontier_urls")
 
 
 class Trope(Base):

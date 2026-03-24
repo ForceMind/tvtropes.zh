@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -69,8 +70,10 @@ class TranslationUpdateRequest(BaseModel):
 class CrawlJobCreateRequest(BaseModel):
     name: str
     seed_url: str
-    interval_minutes: int = Field(default=360, ge=5, le=1440)
-    max_pages_per_run: int = Field(default=20, ge=1, le=100)
+    interval_minutes: int = Field(default=30, ge=5, le=1440)
+    max_pages_per_run: int = Field(default=200, ge=1, le=2000)
+    crawl_scope: Literal["site", "seed"] = Field(default="site")
+    max_depth: int = Field(default=50, ge=1, le=500)
     is_active: bool = True
 
 
@@ -78,7 +81,9 @@ class CrawlJobUpdateRequest(BaseModel):
     name: str | None = None
     seed_url: str | None = None
     interval_minutes: int | None = Field(default=None, ge=5, le=1440)
-    max_pages_per_run: int | None = Field(default=None, ge=1, le=100)
+    max_pages_per_run: int | None = Field(default=None, ge=1, le=2000)
+    crawl_scope: Literal["site", "seed"] | None = None
+    max_depth: int | None = Field(default=None, ge=1, le=500)
     is_active: bool | None = None
 
 
@@ -88,9 +93,14 @@ class CrawlJobView(BaseModel):
     seed_url: str
     interval_minutes: int
     max_pages_per_run: int
+    crawl_scope: str
+    max_depth: int
     is_active: bool
     last_run_at: datetime | None
     next_run_at: datetime | None
+    pending_urls: int = 0
+    done_urls: int = 0
+    failed_urls: int = 0
 
     class Config:
         from_attributes = True
@@ -108,3 +118,40 @@ class CrawlRunView(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CrawlFrontierProgress(BaseModel):
+    job_id: int
+    pending: int
+    done: int
+    failed: int
+    processing: int
+    total: int
+
+
+class PublicTropeListItem(BaseModel):
+    id: int
+    slug: str
+    title: str
+    summary: str
+    has_translation: bool
+    updated_at: datetime
+
+
+class PublicTropeListResponse(BaseModel):
+    total: int
+    items: list[PublicTropeListItem]
+
+
+class PublicTropeDetail(BaseModel):
+    id: int
+    slug: str
+    tvtropes_url: str
+    title_en: str
+    summary_en: str
+    content_en: str
+    title_zh: str
+    summary_zh: str
+    content_zh: str
+    translation_status: str | None = None
+    updated_at: datetime

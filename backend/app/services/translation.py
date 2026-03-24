@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 
@@ -13,8 +14,23 @@ class LibreTranslateService:
     def __init__(self) -> None:
         self._client = httpx.Client(
             timeout=settings.translation_timeout_seconds,
-            headers={"Content-Type": "application/json"},
         )
+
+    def wait_until_ready(self, timeout_seconds: int = 120, interval_seconds: int = 3) -> bool:
+        endpoint = settings.libretranslate_url.rstrip("/") + "/languages"
+        deadline = time.time() + timeout_seconds
+
+        while time.time() < deadline:
+            try:
+                response = self._client.get(endpoint)
+                if response.status_code == 200:
+                    data = response.json()
+                    if isinstance(data, list) and data:
+                        return True
+            except Exception:
+                pass
+            time.sleep(interval_seconds)
+        return False
 
     def _translate_chunk(self, text: str, source: str, target: str) -> str:
         payload = {
@@ -27,10 +43,24 @@ class LibreTranslateService:
             payload["api_key"] = settings.libretranslate_api_key
 
         endpoint = settings.libretranslate_url.rstrip("/") + "/translate"
-        response = self._client.post(endpoint, json=payload)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("translatedText", text)
+        last_error: Exception | None = None
+        for attempt in range(4):
+            try:
+                # Most LibreTranslate deployments expect x-www-form-urlencoded.
+                response = self._client.post(endpoint, data=payload)
+                if response.status_code >= 400:
+                    # Compatibility fallback for deployments that only accept JSON.
+                    response = self._client.post(endpoint, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                return data.get("translatedText", text)
+            except Exception as exc:
+                last_error = exc
+                if attempt < 3:
+                    time.sleep(1.5 * (attempt + 1))
+                continue
+
+        raise RuntimeError(f"translate request failed after retries: {last_error}")
 
     def translate_text(self, text: str, source: str = "en", target: str = "zh") -> str:
         if not text.strip():
