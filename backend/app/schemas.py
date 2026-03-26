@@ -155,3 +155,23 @@ class PublicTropeDetail(BaseModel):
     content_zh: str
     translation_status: str | None = None
     updated_at: datetime
+
+
+class PublicSiteStats(BaseModel):
+    tropes_total: int
+    translated_total: int
+    reviewed_total: int
+    stale_total: int
+    machine_total: int
+    coverage_rate: float
+    reviewed_rate: float
+    active_jobs: int
+    running_jobs: int
+    queue_pending: int
+    queue_processing: int
+    queue_done: int
+    queue_failed: int
+    queue_total: int
+    last_run_status: str | None
+    last_run_started_at: datetime | None
+    last_run_finished_at: datetime | None

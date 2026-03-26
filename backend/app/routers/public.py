@@ -1,12 +1,102 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Translation, Trope
-from app.schemas import PublicTropeDetail, PublicTropeListItem, PublicTropeListResponse
+from app.models import CrawlFrontierUrl, CrawlJob, CrawlRun, Translation, Trope
+from app.schemas import (
+    PublicSiteStats,
+    PublicTropeDetail,
+    PublicTropeListItem,
+    PublicTropeListResponse,
+)
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+
+@router.get("/stats", response_model=PublicSiteStats)
+def get_public_stats(db: Session = Depends(get_db)) -> PublicSiteStats:
+    tropes_total = db.query(func.count(Trope.id)).scalar() or 0
+
+    translated_non_empty_filter = or_(
+        func.length(func.coalesce(Translation.translated_title, "")) > 0,
+        func.length(func.coalesce(Translation.translated_summary, "")) > 0,
+        func.length(func.coalesce(Translation.translated_content, "")) > 0,
+    )
+
+    translated_total = (
+        db.query(func.count(Translation.id))
+        .filter(Translation.language == "zh-CN", translated_non_empty_filter)
+        .scalar()
+        or 0
+    )
+    reviewed_total = (
+        db.query(func.count(Translation.id))
+        .filter(Translation.language == "zh-CN", Translation.status == "reviewed")
+        .scalar()
+        or 0
+    )
+    stale_total = (
+        db.query(func.count(Translation.id))
+        .filter(Translation.language == "zh-CN", Translation.status == "stale")
+        .scalar()
+        or 0
+    )
+    machine_total = (
+        db.query(func.count(Translation.id))
+        .filter(Translation.language == "zh-CN", Translation.status == "machine")
+        .scalar()
+        or 0
+    )
+
+    active_jobs = (
+        db.query(func.count(CrawlJob.id)).filter(CrawlJob.is_active.is_(True)).scalar() or 0
+    )
+    running_jobs = (
+        db.query(func.count(func.distinct(CrawlRun.job_id)))
+        .filter(CrawlRun.status == "running")
+        .scalar()
+        or 0
+    )
+
+    frontier_grouped = (
+        db.query(CrawlFrontierUrl.status, func.count(CrawlFrontierUrl.id))
+        .group_by(CrawlFrontierUrl.status)
+        .all()
+    )
+    frontier_status = {status: int(count) for status, count in frontier_grouped}
+    queue_pending = frontier_status.get("pending", 0)
+    queue_processing = frontier_status.get("processing", 0)
+    queue_done = frontier_status.get("done", 0)
+    queue_failed = frontier_status.get("failed", 0)
+    queue_total = queue_pending + queue_processing + queue_done + queue_failed
+
+    last_run = db.query(CrawlRun).order_by(desc(CrawlRun.started_at)).first()
+
+    coverage_rate = round((translated_total / tropes_total) * 100, 1) if tropes_total else 0.0
+    reviewed_rate = (
+        round((reviewed_total / translated_total) * 100, 1) if translated_total else 0.0
+    )
+
+    return PublicSiteStats(
+        tropes_total=tropes_total,
+        translated_total=translated_total,
+        reviewed_total=reviewed_total,
+        stale_total=stale_total,
+        machine_total=machine_total,
+        coverage_rate=coverage_rate,
+        reviewed_rate=reviewed_rate,
+        active_jobs=active_jobs,
+        running_jobs=running_jobs,
+        queue_pending=queue_pending,
+        queue_processing=queue_processing,
+        queue_done=queue_done,
+        queue_failed=queue_failed,
+        queue_total=queue_total,
+        last_run_status=last_run.status if last_run else None,
+        last_run_started_at=last_run.started_at if last_run else None,
+        last_run_finished_at=last_run.finished_at if last_run else None,
+    )
 
 
 @router.get("/tropes", response_model=PublicTropeListResponse)
